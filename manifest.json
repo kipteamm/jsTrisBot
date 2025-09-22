@@ -1,0 +1,29 @@
+{
+    "manifest_version": 3,
+    "name": "ElaineDeBot",
+    "version": "1.0",
+    "permissions": [
+        "scripting",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "*://*/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "*://jstris.jezevec10.com/*"
+            ],
+            "js": [
+                "js/injector.js"
+            ],
+            "run_at": "document_start"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["js/manager.js"],
+            "matches": ["*://jstris.jezevec10.com/*"]
+        }
+    ]
+}

@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "es6",
+        "module": "es6",
+        "outDir": "./js", // compiled output
+        "rootDir": "./ts", // only compile files from here
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "declaration": false, // prevents .d.ts files
+        "sourceMap": false // set true if you want source maps
+    },
+    "include": [
+        "ts/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}
