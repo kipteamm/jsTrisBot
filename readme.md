@@ -1,0 +1,1 @@
+The issue is that stripped rotations DO NOT TAKE into account that they will positioned differently

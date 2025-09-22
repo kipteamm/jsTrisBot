@@ -128,9 +128,12 @@ function delay(ms) {
 }
 function place() {
     return __awaiter(this, void 0, void 0, function* () {
+        if (window.__game.placedBlocks > 4)
+            return;
         const hold = shouldHold();
         if (hold)
             sendKeyEvent("c", 67);
+        console.log(window.__game.nextMove);
         switch (window.__game.nextMove.rot) {
             case 0: break;
             case 1:
@@ -143,20 +146,22 @@ function place() {
                 sendKeyEvent("a", 65);
                 break;
         }
-        let col = window.__game.nextMove.col - 3;
-        while (col !== 0) {
-            if (col < 0) {
-                sendKeyEvent("ArrowLeft", 37);
+        console.log(window.__game.activeBlock.pos.x);
+        const goalCol = window.__game.nextMove.col;
+        let col = window.__game.activeBlock.pos.x;
+        while (col !== goalCol) {
+            if (col < goalCol) {
+                sendKeyEvent("ArrowRight", 39);
                 col++;
             }
             else {
-                sendKeyEvent("ArrowRight", 39);
+                sendKeyEvent("ArrowLeft", 37);
                 col--;
             }
             yield delay(Math.floor(Math.random() * 310) + 200);
         }
         window.__game.hardDrop();
-        setTimeout(place, 300);
+        setTimeout(place, 1000);
     });
 }
 document.addEventListener("GameCaptured", () => {
