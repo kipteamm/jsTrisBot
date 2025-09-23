@@ -15,9 +15,15 @@ type Evaluation = {
     col: number;
 }
 
+interface TrimmedBlock {
+    matrix: number[][];
+    offset: number;
+    width: number;
+}
+
 function sendKeyEvent(name: string, keyCode: number) {
     try {
-        const keyboardEvent = new KeyboardEvent('keydown', {
+        const eventDict = {
             key: name,
             code: name,
             keyCode: keyCode,
@@ -25,28 +31,45 @@ function sendKeyEvent(name: string, keyCode: number) {
             bubbles: true,
             cancelable: true,
             composed: true
-        });
-
+        }
+        const keyboardEvent = new KeyboardEvent("keydown", eventDict);
         document.dispatchEvent(keyboardEvent);
-        console.log(name);
+        // console.log("DOWN", name);
+        
+        setTimeout(() => {
+            const keyboardEvent = new KeyboardEvent("keyup", eventDict);
+            document.dispatchEvent(keyboardEvent);
+            // console.log("UP", name);
+        }, Math.floor(Math.random() * (21) + 20))
+
     } catch (err) {
         console.error("Error dispatching event:", err);
     }
 }
 
-function stripMatrix(matrix: number[][]) {
-    return matrix.filter(row => row.some(cell => cell !== 0));
-    // const rowsStripped = matrix.filter(row => row.some(cell => cell !== 0));
+function stripMatrix(fullMatrix: number[][]): TrimmedBlock {
+    let top = fullMatrix.length, bottom = -1;
+    let left = fullMatrix[0].length, right = -1;
 
-    // const colsToKeep: number[] = [];
-    // for (let col = 0; col < matrix[0].length; col++) {
-    //     if (rowsStripped.some(row => row[col] !== 0)) {
-    //         colsToKeep.push(col);
-    //     }
-    // }
-    
-    // return rowsStripped.map(row => colsToKeep.map(colIndex => row[colIndex]));
+    for (let r = 0; r < fullMatrix.length; r++) {
+        for (let c = 0; c < fullMatrix[r].length; c++) {
+            if (fullMatrix[r][c] !== 0) {
+                if (r < top) top = r;
+                if (r > bottom) bottom = r;
+                if (c < left) left = c;
+                if (c > right) right = c;
+            }
+        }
+    }
+
+    if (right === -1) return { matrix: [], offset: 0, width: 0 };
+
+    const width = right - left + 1;
+    const trimmed = fullMatrix.slice(top, bottom + 1).map(row => row.slice(left, right + 1));
+
+    return { matrix: trimmed, offset: left, width };
 }
+
 
 function getAbsoluteLength(matrix: number[][]) {
     let length = 4;
@@ -91,7 +114,19 @@ function calculateFlatness(board: number[][], height: number) {
 }
 
 function calculateGaps(board: number[][], height: number) {
-    return 0;
+    let gaps = 0;
+    for (let r = 19; r > 0; r--) {
+        const row = board[r];
+        let rowGaps = 0;
+        
+        for (let c = 0; c < 10; c++) {
+            if (row[c] === 0 && board[r - 1][c] !== 0) rowGaps++
+        }
+
+        gaps += rowGaps * r;
+    }
+
+    return gaps * 10;
 }
 
 function calculateB2B(board: number[][], height: number) {
@@ -119,8 +154,8 @@ function evaluateBoard(blockMatrix: number[][], column: number): number {
     const gaps = calculateGaps(board, height);
     const maintainsB2B = calculateB2B(board, height);
 
-    // console.log(wellPotential, flatness, gaps, maintainsB2B);
     window.__game.testBoard = JSON.stringify(board);
+    window.__game.testScores = {well: wellPotential, flat: flatness, gaps: gaps, b2b: maintainsB2B};
 
     return (wellPotential * 2) + (flatness * -2) + (gaps * -3) + (maintainsB2B * 5);
 }
@@ -130,25 +165,28 @@ function evaluate(block: Block): Evaluation {
     const blockSet = window.__game.blockSets[block.set];
     let bestBoard = "";
     let bestRot = "";
+    let bestScores;
     let bestScore = Number.NEGATIVE_INFINITY;
     let bestMove = {rot: 0, col: 0};
 
     for (let rot = 0; rot < 4; rot++) {
-        const blockMatrix: number[][] = stripMatrix(blockSet.blocks[block.id].blocks[rot]);
+        const { matrix, offset, width } = stripMatrix(blockSet.blocks[block.id].blocks[rot]);
 
-        for (let column = 0; column < 9 - getAbsoluteLength(blockMatrix); column++) {
-            const newScore: number = evaluateBoard(blockMatrix, column);
+        for (let column = 0; column <= 9 - width; column++) {
+            const newScore = evaluateBoard(matrix, column + offset); 
             
             if (newScore < bestScore) continue; 
+            bestScores = window.__game.testScores;
             bestBoard = window.__game.testBoard;
-            bestRot = JSON.stringify(blockMatrix);
+            bestRot = JSON.stringify(matrix);
             bestScore = newScore;
             bestMove = {rot: rot, col: column};
         }
     }
     
     console.log(bestRot.replaceAll("],", "],\n "));
-    console.log(bestBoard.replaceAll("],", "],\n "));
+    // console.log(bestBoard.replaceAll("],", "],\n "));
+    console.log(`wellPotential ${bestScores.well * 2}, flatness ${bestScores.flat * -2}, gaps ${bestScores.gaps * -3}, b2b ${bestScores.b2b   *5}`);
     return { score: bestScore, ...bestMove };
 }
 
@@ -156,10 +194,11 @@ function shouldHold() {
     if (window.__game.activeBlock.id === window.__game.queue[0].id) return false;
     
     const activeResult = evaluate(window.__game.activeBlock);
-    const holdResult = evaluate(window.__game.queue[0]);
-    
     console.log("ACTIVE: ", activeResult.score);
+    
+    const holdResult = evaluate(window.__game.queue[0]);
     console.log("HOLD: ", holdResult.score);
+    
 
     if (activeResult.score >= holdResult.score) {
         window.__game.nextMove = {col: activeResult.col, rot: activeResult.rot};
@@ -175,7 +214,7 @@ function delay(ms: number) {
 }
 
 async function place() {
-    if (window.__game.placedBlocks > 0) return;
+    if (window.__game.placedBlocks > 3) return;
 
     const hold = shouldHold();
     if (hold) sendKeyEvent("c", 67);
@@ -199,8 +238,7 @@ async function place() {
             col--;
         }
     
-        await delay(70);
-
+        await delay(Math.floor(Math.random() * (21) + 40));
     }
 
     window.__game.hardDrop()
