@@ -35,20 +35,30 @@ function sendKeyEvent(name: string, keyCode: number) {
 }
 
 function stripMatrix(matrix: number[][]) {
-    const rowsStripped = matrix.filter(row => row.some(cell => cell !== 0));
+    return matrix.filter(row => row.some(cell => cell !== 0));
+    // const rowsStripped = matrix.filter(row => row.some(cell => cell !== 0));
 
-    const colsToKeep: number[] = [];
-    for (let col = 0; col < matrix[0].length; col++) {
-        if (rowsStripped.some(row => row[col] !== 0)) {
-            colsToKeep.push(col);
-        }
-    }
+    // const colsToKeep: number[] = [];
+    // for (let col = 0; col < matrix[0].length; col++) {
+    //     if (rowsStripped.some(row => row[col] !== 0)) {
+    //         colsToKeep.push(col);
+    //     }
+    // }
     
-    return rowsStripped.map(row => colsToKeep.map(colIndex => row[colIndex]));
+    // return rowsStripped.map(row => colsToKeep.map(colIndex => row[colIndex]));
+}
+
+function getAbsoluteLength(matrix: number[][]) {
+    let length = 4;
+    for (let c = 0; c < 4; c++) {
+        const column = matrix.map(row => row[c]);
+        if (column.every(a => a === 0)) length--;
+    }
+    console.error("THIS SHOULD NOT BE USED!!! TAKE Z OR S ROTATIONS 1 FOR INSTANCE")
+    return length;
 }
 
 function getTopRow(board: number[][], blockMatrix: number[][], column: number) {
-    blockMatrix = stripMatrix(blockMatrix);
     let blockRow = 0;
     
     for (let r = 19; r >= 0; r--) {
@@ -72,8 +82,7 @@ function calculateFlatness(board: number[][], height: number) {
     let messiness = 0;
     for (let r = height + 1; r < 20; r++) {
         const percentage = board[r].filter(a => a !== 0).length / 10;
-        const rowHeightPenalty = 20 - r;
-        const emptinessPenalty = (1 - percentage) * rowHeightPenalty;
+        const emptinessPenalty = (1 - percentage) * r;
         
         messiness += emptinessPenalty * emptinessPenalty;
         if (percentage === 1) break;
@@ -94,7 +103,7 @@ function evaluateBoard(blockMatrix: number[][], column: number): number {
     const row = getTopRow(board, blockMatrix, column);
 
     for (let r = row; r < (row + blockMatrix.length); r++) {
-        for (let c = column; c < blockMatrix[0].length; c++) {
+        for (let c = column; c < column + blockMatrix[0].length; c++) {
             board[r][c] = blockMatrix[r - row][c - column];
         }
     }
@@ -111,6 +120,7 @@ function evaluateBoard(blockMatrix: number[][], column: number): number {
     const maintainsB2B = calculateB2B(board, height);
 
     // console.log(wellPotential, flatness, gaps, maintainsB2B);
+    window.__game.testBoard = JSON.stringify(board);
 
     return (wellPotential * 2) + (flatness * -2) + (gaps * -3) + (maintainsB2B * 5);
 }
@@ -118,21 +128,27 @@ function evaluateBoard(blockMatrix: number[][], column: number): number {
 function evaluate(block: Block): Evaluation {
     // loop over all rotations
     const blockSet = window.__game.blockSets[block.set];
+    let bestBoard = "";
+    let bestRot = "";
     let bestScore = Number.NEGATIVE_INFINITY;
     let bestMove = {rot: 0, col: 0};
 
     for (let rot = 0; rot < 4; rot++) {
         const blockMatrix: number[][] = stripMatrix(blockSet.blocks[block.id].blocks[rot]);
 
-        for (let column = 0; column < 9 - blockMatrix[0].length; column++) {
+        for (let column = 0; column < 9 - getAbsoluteLength(blockMatrix); column++) {
             const newScore: number = evaluateBoard(blockMatrix, column);
             
             if (newScore < bestScore) continue; 
+            bestBoard = window.__game.testBoard;
+            bestRot = JSON.stringify(blockMatrix);
             bestScore = newScore;
             bestMove = {rot: rot, col: column};
         }
     }
     
+    console.log(bestRot.replaceAll("],", "],\n "));
+    console.log(bestBoard.replaceAll("],", "],\n "));
     return { score: bestScore, ...bestMove };
 }
 
@@ -159,7 +175,7 @@ function delay(ms: number) {
 }
 
 async function place() {
-    if (window.__game.placedBlocks > 4) return;
+    if (window.__game.placedBlocks > 0) return;
 
     const hold = shouldHold();
     if (hold) sendKeyEvent("c", 67);
@@ -167,12 +183,10 @@ async function place() {
 
     switch (window.__game.nextMove.rot) {
         case 0: break;
-        case 1: sendKeyEvent("z", 90); break;
-        case 2: sendKeyEvent("ArrowUp", 38); break;
-        case 3: sendKeyEvent("a", 65); break;
+        case 1: sendKeyEvent("ArrowUp", 38); break;
+        case 2: sendKeyEvent("a", 65); break;
+        case 3: sendKeyEvent("z", 90); break;
     }
-
-    console.log(window.__game.activeBlock.pos.x);
 
     const goalCol = window.__game.nextMove.col;
     let col = window.__game.activeBlock.pos.x;
@@ -185,7 +199,7 @@ async function place() {
             col--;
         }
     
-        await delay(Math.floor(Math.random() * 310) + 200);
+        await delay(70);
 
     }
 

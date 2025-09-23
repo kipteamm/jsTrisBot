@@ -27,17 +27,27 @@ function sendKeyEvent(name, keyCode) {
     }
 }
 function stripMatrix(matrix) {
-    const rowsStripped = matrix.filter(row => row.some(cell => cell !== 0));
-    const colsToKeep = [];
-    for (let col = 0; col < matrix[0].length; col++) {
-        if (rowsStripped.some(row => row[col] !== 0)) {
-            colsToKeep.push(col);
-        }
+    return matrix.filter(row => row.some(cell => cell !== 0));
+    // const rowsStripped = matrix.filter(row => row.some(cell => cell !== 0));
+    // const colsToKeep: number[] = [];
+    // for (let col = 0; col < matrix[0].length; col++) {
+    //     if (rowsStripped.some(row => row[col] !== 0)) {
+    //         colsToKeep.push(col);
+    //     }
+    // }
+    // return rowsStripped.map(row => colsToKeep.map(colIndex => row[colIndex]));
+}
+function getAbsoluteLength(matrix) {
+    let length = 4;
+    for (let c = 0; c < 4; c++) {
+        const column = matrix.map(row => row[c]);
+        if (column.every(a => a === 0))
+            length--;
     }
-    return rowsStripped.map(row => colsToKeep.map(colIndex => row[colIndex]));
+    console.error("THIS SHOULD NOT BE USED!!! TAKE Z OR S ROTATIONS 1 FOR INSTANCE");
+    return length;
 }
 function getTopRow(board, blockMatrix, column) {
-    blockMatrix = stripMatrix(blockMatrix);
     let blockRow = 0;
     for (let r = 19; r >= 0; r--) {
         const row = board[r].slice(column, blockMatrix[0].length);
@@ -57,8 +67,7 @@ function calculateFlatness(board, height) {
     let messiness = 0;
     for (let r = height + 1; r < 20; r++) {
         const percentage = board[r].filter(a => a !== 0).length / 10;
-        const rowHeightPenalty = 20 - r;
-        const emptinessPenalty = (1 - percentage) * rowHeightPenalty;
+        const emptinessPenalty = (1 - percentage) * r;
         messiness += emptinessPenalty * emptinessPenalty;
         if (percentage === 1)
             break;
@@ -75,7 +84,7 @@ function evaluateBoard(blockMatrix, column) {
     const board = structuredClone(window.__game.matrix);
     const row = getTopRow(board, blockMatrix, column);
     for (let r = row; r < (row + blockMatrix.length); r++) {
-        for (let c = column; c < blockMatrix[0].length; c++) {
+        for (let c = column; c < column + blockMatrix[0].length; c++) {
             board[r][c] = blockMatrix[r - row][c - column];
         }
     }
@@ -90,23 +99,30 @@ function evaluateBoard(blockMatrix, column) {
     const gaps = calculateGaps(board, height);
     const maintainsB2B = calculateB2B(board, height);
     // console.log(wellPotential, flatness, gaps, maintainsB2B);
+    window.__game.testBoard = JSON.stringify(board);
     return (wellPotential * 2) + (flatness * -2) + (gaps * -3) + (maintainsB2B * 5);
 }
 function evaluate(block) {
     // loop over all rotations
     const blockSet = window.__game.blockSets[block.set];
+    let bestBoard = "";
+    let bestRot = "";
     let bestScore = Number.NEGATIVE_INFINITY;
     let bestMove = { rot: 0, col: 0 };
     for (let rot = 0; rot < 4; rot++) {
         const blockMatrix = stripMatrix(blockSet.blocks[block.id].blocks[rot]);
-        for (let column = 0; column < 9 - blockMatrix[0].length; column++) {
+        for (let column = 0; column < 9 - getAbsoluteLength(blockMatrix); column++) {
             const newScore = evaluateBoard(blockMatrix, column);
             if (newScore < bestScore)
                 continue;
+            bestBoard = window.__game.testBoard;
+            bestRot = JSON.stringify(blockMatrix);
             bestScore = newScore;
             bestMove = { rot: rot, col: column };
         }
     }
+    console.log(bestRot.replaceAll("],", "],\n "));
+    console.log(bestBoard.replaceAll("],", "],\n "));
     return Object.assign({ score: bestScore }, bestMove);
 }
 function shouldHold() {
@@ -128,7 +144,7 @@ function delay(ms) {
 }
 function place() {
     return __awaiter(this, void 0, void 0, function* () {
-        if (window.__game.placedBlocks > 4)
+        if (window.__game.placedBlocks > 0)
             return;
         const hold = shouldHold();
         if (hold)
@@ -137,16 +153,15 @@ function place() {
         switch (window.__game.nextMove.rot) {
             case 0: break;
             case 1:
-                sendKeyEvent("z", 90);
-                break;
-            case 2:
                 sendKeyEvent("ArrowUp", 38);
                 break;
-            case 3:
+            case 2:
                 sendKeyEvent("a", 65);
                 break;
+            case 3:
+                sendKeyEvent("z", 90);
+                break;
         }
-        console.log(window.__game.activeBlock.pos.x);
         const goalCol = window.__game.nextMove.col;
         let col = window.__game.activeBlock.pos.x;
         while (col !== goalCol) {
@@ -158,7 +173,7 @@ function place() {
                 sendKeyEvent("ArrowLeft", 37);
                 col--;
             }
-            yield delay(Math.floor(Math.random() * 310) + 200);
+            yield delay(70);
         }
         window.__game.hardDrop();
         setTimeout(place, 1000);

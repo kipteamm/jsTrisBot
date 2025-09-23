@@ -1,14 +1,24 @@
 function stripMatrix(matrix) {
-    const rowsStripped = matrix.filter(row => row.some(cell => cell !== 0));
+    return matrix.filter(row => row.some(cell => cell !== 0));
+    // const rowsStripped = matrix.filter(row => row.some(cell => cell !== 0));
 
-    const colsToKeep = [];
-    for (let col = 0; col < matrix[0].length; col++) {
-        if (rowsStripped.some(row => row[col] !== 0)) {
-            colsToKeep.push(col);
-        }
-    }
+    // const colsToKeep = [];
+    // for (let col = 0; col < matrix[0].length; col++) {
+    //     if (rowsStripped.some(row => row[col] !== 0)) {
+    //         colsToKeep.push(col);
+    //     }
+    // }
     
-    return rowsStripped.map(row => colsToKeep.map(colIndex => row[colIndex]));
+    // return rowsStripped.map(row => colsToKeep.map(colIndex => row[colIndex]));
+}
+
+function getAbsoluteLength(matrix) {
+    let length = 4;
+    for (let c = 0; c < 4; c++) {
+        const column = matrix.map(row => row[c]);
+        if (column.every(a => a === 0)) length--;
+    }
+    return length;
 }
 
 function getTopRow(board, blockMatrix, column) {
@@ -44,9 +54,8 @@ function calculateFlatness(board, height) {
     let messiness = 0;
     for (let r = height + 1; r < 20; r++) {
         const percentage = board[r].filter(a => a !== 0).length / 10;
-        const rowHeightPenalty = 20 - r;
-        const emptinessPenalty = (1 - percentage) * rowHeightPenalty;
-        
+        const emptinessPenalty = (1 - percentage) * r;
+
         messiness += emptinessPenalty * emptinessPenalty;
         if (percentage === 1) break;
     }
@@ -65,8 +74,7 @@ function evaluateBoard(board, blockMatrix, column) {
     const row = getTopRow(board, blockMatrix, column);
 
     for (let r = row; r < (row + blockMatrix.length); r++) {
-        for (let c = column; c < blockMatrix[0].length; c++) {
-            console.log(r - row, c - column)
+        for (let c = column; c < column + blockMatrix[0].length; c++) {
             board[r][c] = blockMatrix[r - row][c - column];
         }
     }
@@ -85,14 +93,22 @@ function evaluateBoard(board, blockMatrix, column) {
     return wellPotential + flatness * -2 + gaps * -3 + maintainsB2B * 5;
 }
 
-const board = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[4,0,0,0,0,0,0,0,0,0],[4,4,0,0,0,0,0,1,1,0],[0,4,0,0,0,0,0,0,1,1]];
-console.log(`${board[0].length} x ${board.length}`);
+// S PIECE
+const rotations = [[[0,0,0,0],[0,1,2,0],[3,4,0,0],[0,0,0,0]],[[0,0,0,0],[0,3,0,0],[0,4,1,0],[0,0,2,0]],[[0,0,0,0],[0,0,0,0],[0,4,3,0],[2,1,0,0]],[[0,0,0,0],[2,0,0,0],[1,4,0,0],[0,3,0,0]]]
+// Z PIECE
+// const rotations = [[[0,0,0,0],[1,2,0,0],[0,3,4,0],[0,0,0,0]],[[0,0,0,0],[0,0,1,0],[0,3,2,0],[0,4,0,0]],[[0,0,0,0],[0,0,0,0],[4,3,0,0],[0,2,1,0]],[[0,0,0,0],[0,4,0,0],[2,3,0,0],[1,0,0,0]]]
 
-const blockMatrix = stripMatrix([
-    [0, 0, 0, 0], 
-    [1, 2, 3, 4],
-    [0, 0, 0, 0],
-    [0, 0, 0, 0]
-]);
+// rotations.forEach(rotation => {
+//     const board = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]];
+//     const blockMatrix = stripMatrix(rotation);
+//     console.log(JSON.stringify(rotation).replaceAll("],", "],\n "));
+//     console.log(JSON.stringify(board).replaceAll("],", "],\n "));
+//     console.log(evaluateBoard(board, blockMatrix, 6))
+// })
 
-console.log(evaluateBoard(board, blockMatrix, 0))
+const board = [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]];
+const blockMatrix = stripMatrix(rotations[1]);
+console.log("Score:", evaluateBoard(board, blockMatrix, 7))
+console.log(JSON.stringify(blockMatrix).replaceAll("],", "],\n "));
+board.push([0,1,2,3,4,5,6,7,8,9])
+console.log(JSON.stringify(board).replaceAll("],", "],\n "));
