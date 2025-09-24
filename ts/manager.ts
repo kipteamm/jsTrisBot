@@ -11,6 +11,8 @@ type Block = {
 
 type Evaluation = {
     score: number;
+    bestBoard: string,
+    bestRot: string,
     rot: number;
     col: number;
 }
@@ -22,30 +24,31 @@ interface TrimmedBlock {
 }
 
 function sendKeyEvent(name: string, keyCode: number) {
-    try {
-        const eventDict = {
-            key: name,
-            code: name,
-            keyCode: keyCode,
-            which: keyCode,
-            bubbles: true,
-            cancelable: true,
-            composed: true
-        }
-        const keyboardEvent = new KeyboardEvent("keydown", eventDict);
-        document.dispatchEvent(keyboardEvent);
-        // console.log("DOWN", name);
-        
-        setTimeout(() => {
-            const keyboardEvent = new KeyboardEvent("keyup", eventDict);
-            document.dispatchEvent(keyboardEvent);
-            // console.log("UP", name);
-        }, Math.floor(Math.random() * (21) + 20))
-
-    } catch (err) {
-        console.error("Error dispatching event:", err);
+    const eventDict = {
+        key: name,
+        code: name,
+        keyCode: keyCode,
+        which: keyCode,
+        bubbles: true,
+        cancelable: true,
+        composed: true
     }
+    const keyboardEvent = new KeyboardEvent("keydown", eventDict);
+    document.dispatchEvent(keyboardEvent);
+    // console.log("DOWN", name);
+    
+    setTimeout(() => {
+        const keyboardEvent = new KeyboardEvent("keyup", eventDict);
+        document.dispatchEvent(keyboardEvent);
+        // console.log("UP", name);
+    }, Math.floor(Math.random() * (21) + 20))
 }
+
+window.addEventListener("keydown", (event) => {
+    if (event.key !== "p") return;
+    window.__game.paused = !window.__game.paused;
+    if (!window.__game.paused) place();
+}, true);
 
 function stripMatrix(fullMatrix: number[][]): TrimmedBlock {
     let top = fullMatrix.length, bottom = -1;
@@ -161,11 +164,10 @@ function evaluateBoard(blockMatrix: number[][], column: number): number {
 }
 
 function evaluate(block: Block): Evaluation {
-    // loop over all rotations
     const blockSet = window.__game.blockSets[block.set];
     let bestBoard = "";
     let bestRot = "";
-    let bestScores;
+    let bestScores = {well: 0, flat: 0, gaps: 0, b2b: 0};
     let bestScore = Number.NEGATIVE_INFINITY;
     let bestMove = {rot: 0, col: 0};
 
@@ -177,57 +179,59 @@ function evaluate(block: Block): Evaluation {
             
             if (newScore < bestScore) continue; 
             bestScores = window.__game.testScores;
-            bestBoard = window.__game.testBoard;
+            bestBoard = JSON.stringify(window.__game.testBoard);
             bestRot = JSON.stringify(matrix);
             bestScore = newScore;
             bestMove = {rot: rot, col: column};
         }
     }
-    
-    console.log(bestRot.replaceAll("],", "],\n "));
-    // console.log(bestBoard.replaceAll("],", "],\n "));
-    console.log(`wellPotential ${bestScores.well * 2}, flatness ${bestScores.flat * -2}, gaps ${bestScores.gaps * -3}, b2b ${bestScores.b2b   *5}`);
-    return { score: bestScore, ...bestMove };
+
+    // console.log(`wellPotential ${bestScores.well * 2}, flatness ${bestScores.flat * -2}, gaps ${bestScores.gaps * -3}, b2b ${bestScores.b2b   *5}`);
+    return { score: bestScore, bestBoard: bestBoard, bestRot: bestRot, ...bestMove };
 }
 
-function shouldHold() {
-    if (window.__game.activeBlock.id === window.__game.queue[0].id) return false;
-    
-    const activeResult = evaluate(window.__game.activeBlock);
-    console.log("ACTIVE: ", activeResult.score);
-    
-    const holdResult = evaluate(window.__game.queue[0]);
-    console.log("HOLD: ", holdResult.score);
-    
-
-    if (activeResult.score >= holdResult.score) {
-        window.__game.nextMove = {col: activeResult.col, rot: activeResult.rot};
-        return false;
-    }
-
-    window.__game.nextMove = {col: holdResult.col, rot: holdResult.rot}
-    return true;
-}
-
-function delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+function delay(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 async function place() {
-    if (window.__game.placedBlocks > 3) return;
+    if (window.__game.paused) return;
 
-    const hold = shouldHold();
+    const activeResult = evaluate(window.__game.activeBlock);
+    // console.log("ACTIVE: ", activeResult.score);
+
+    let goalCol = activeResult.col;
+    let rot = activeResult.rot;
+
+    const holdBlock = window.__game.blockInHold? window.__game.blockInHold: window.__game.queue[0]
+    let hold = false;
+    
+    if (window.__game.activeBlock.id !== holdBlock.id) {
+        const holdResult = evaluate(holdBlock);
+        // console.log("HOLD: ", holdResult.score);
+        hold = holdResult.score > activeResult.score;
+        
+        if (hold) {
+            goalCol = holdResult.col;
+            rot = holdResult.rot;
+
+            console.log("HOLD");
+            console.log(holdResult.bestRot.replaceAll("],", "],\n "));   
+            console.log(holdResult.bestBoard.replaceAll("],", "],\n ")) 
+        }
+    }
+
     if (hold) sendKeyEvent("c", 67);
-    console.log(window.__game.nextMove);
+    else {
+        console.log(activeResult.bestRot.replaceAll("],", "],\n "));   
+        console.log(activeResult.bestBoard.replaceAll("],", "],\n ")) 
+    }
 
-    switch (window.__game.nextMove.rot) {
+    switch (rot) {
         case 0: break;
         case 1: sendKeyEvent("ArrowUp", 38); break;
         case 2: sendKeyEvent("a", 65); break;
         case 3: sendKeyEvent("z", 90); break;
     }
 
-    const goalCol = window.__game.nextMove.col;
     let col = window.__game.activeBlock.pos.x;
     while (col !== goalCol) {
         if (col < goalCol) {
@@ -237,17 +241,17 @@ async function place() {
             sendKeyEvent("ArrowLeft", 37);
             col--;
         }
-    
+        
         await delay(Math.floor(Math.random() * (21) + 40));
     }
-
+    
     window.__game.hardDrop()
     setTimeout(place, 1000);
 }
 
 document.addEventListener("GameCaptured", () => {
     // window.__game.activeBlock
-    // window.__game.matrix board
+    // window.__game.matrix
     // window.__game.queue
     // window.__game.blockInHold
     // window.__game.holdBlock()
@@ -261,9 +265,10 @@ function waitForGame() {
     if (typeof window.Game === 'undefined') return setTimeout(waitForGame, 100);
     const RealGame = window.Game;
 
-    function GameWrapper(...args) {
+    function GameWrapper(...args: any[]) {
         const inst = new RealGame(...args);
         window.__game = inst;
+        window.__game.paused = false;
         console.log("GAME CAPTURED");
 
         setTimeout(() => {

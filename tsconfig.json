@@ -9,7 +9,11 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "declaration": false, // prevents .d.ts files
-        "sourceMap": false // set true if you want source maps
+        "sourceMap": false, // set true if you want source maps
+        "lib": [
+            "ES2021",
+            "DOM",
+        ]
     },
     "include": [
         "ts/**/*.ts"
