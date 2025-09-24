@@ -9,10 +9,18 @@ type Block = {
     item: number;
 };
 
+type Scores = {
+    well: number,
+    gaps: number,
+    flat: number,
+    b2b: number
+}
+
 type Evaluation = {
     score: number;
     bestBoard: string,
     bestRot: string,
+    bestScores: Scores,
     rot: number;
     col: number;
 }
@@ -73,35 +81,37 @@ function stripMatrix(fullMatrix: number[][]): TrimmedBlock {
     return { matrix: trimmed, offset: left, width };
 }
 
-
-function getAbsoluteLength(matrix: number[][]) {
-    let length = 4;
-    for (let c = 0; c < 4; c++) {
-        const column = matrix.map(row => row[c]);
-        if (column.every(a => a === 0)) length--;
-    }
-    console.error("THIS SHOULD NOT BE USED!!! TAKE Z OR S ROTATIONS 1 FOR INSTANCE")
-    return length;
-}
-
 function getTopRow(board: number[][], blockMatrix: number[][], column: number) {
-    let blockRow = 0;
-    
-    for (let r = 19; r >= 0; r--) {
-        const row = board[r].slice(column, blockMatrix[0].length);
-        const isValid = row.every((value, index) => value === 0 || blockMatrix[blockRow][index] === 0);
+    const height = blockMatrix.length;
+    const width = blockMatrix[0].length;
 
-        if (!isValid) continue;
-        if (blockRow + 1 === blockMatrix.length) return r;
+    for (let r = board.length - height; r >= 0; r--) {
+        let collision = false;
 
-        blockRow++;
+        for (let br = 0; br < height && !collision; br++) {
+            for (let bc = 0; bc < width && !collision; bc++) {
+                if (blockMatrix[br][bc] !== 0 && board[r + br][column + bc] !== 0) {
+                    collision = true;
+                }
+            }
+        }
+
+        if (!collision) return r;
     }
 
     return -1;
 }
 
-function calculateWellPotential(board: number[][], height: number) {
-    return 0;
+function calculateWellPotential(board: number[][]) {
+    let emptyCount = 0;
+
+    for (let col = 0; col < 10; col++) {
+        const empty = board.filter(row => row[col] === 0).length;
+        if (empty) emptyCount++
+        else if (emptyCount) return -100;
+    }
+
+    return emptyCount > 1 ? -100 : 100;
 }
 
 function calculateFlatness(board: number[][], height: number) {
@@ -116,7 +126,7 @@ function calculateFlatness(board: number[][], height: number) {
     return messiness;
 }
 
-function calculateGaps(board: number[][], height: number) {
+function calculateGaps(board: number[][]) {
     let gaps = 0;
     for (let r = 19; r > 0; r--) {
         const row = board[r];
@@ -132,17 +142,29 @@ function calculateGaps(board: number[][], height: number) {
     return gaps * 10;
 }
 
-function calculateB2B(board: number[][], height: number) {
+function calculateB2B(board: number[][]) {
+    let consecutiveFull = 0;
+
+    for (let r = 0; r < board.length; r++) {
+        if (board[r].every(cell => cell !== 0)) {
+            consecutiveFull++;
+            if (consecutiveFull === 4) return 100;
+        } else {
+            consecutiveFull = 0;
+        }
+    }
+
     return 0;
 }
 
 function evaluateBoard(blockMatrix: number[][], column: number): number {
     const board: number[][] = structuredClone(window.__game.matrix);
     const row = getTopRow(board, blockMatrix, column);
+    if (row === -1) return Number.NEGATIVE_INFINITY;
 
     for (let r = row; r < (row + blockMatrix.length); r++) {
         for (let c = column; c < column + blockMatrix[0].length; c++) {
-            board[r][c] = blockMatrix[r - row][c - column];
+            board[r][c] = blockMatrix[r - row][c - column] || board[r][c];
         }
     }
 
@@ -152,15 +174,15 @@ function evaluateBoard(blockMatrix: number[][], column: number): number {
         if (board[i].every(a => a === 0)) break;
     }
 
-    const wellPotential = calculateWellPotential(board, height);
+    const wellPotential = calculateWellPotential(board);
     const flatness = calculateFlatness(board, height);
-    const gaps = calculateGaps(board, height);
-    const maintainsB2B = calculateB2B(board, height);
+    const gaps = calculateGaps(board);
+    const maintainsB2B = calculateB2B(board);
 
     window.__game.testBoard = JSON.stringify(board);
-    window.__game.testScores = {well: wellPotential, flat: flatness, gaps: gaps, b2b: maintainsB2B};
+    window.__game.testScores = {well: wellPotential * 2, flat: flatness * -2, gaps: gaps * -4, b2b: maintainsB2B * 5};
 
-    return (wellPotential * 2) + (flatness * -2) + (gaps * -3) + (maintainsB2B * 5);
+    return (wellPotential * 3) + (flatness * -2) + (gaps * -4) + (maintainsB2B * 5);
 }
 
 function evaluate(block: Block): Evaluation {
@@ -175,6 +197,7 @@ function evaluate(block: Block): Evaluation {
         const { matrix, offset, width } = stripMatrix(blockSet.blocks[block.id].blocks[rot]);
 
         for (let column = 0; column <= 9 - width; column++) {
+            // THE OFFEST CAUSES ALL PIECES WITH A LEFTMOST COLUMN EMPTY TO NEVER BE PLACED IN THE LEFTMOST COLUMN OF THE BOARD
             const newScore = evaluateBoard(matrix, column + offset); 
             
             if (newScore < bestScore) continue; 
@@ -186,14 +209,14 @@ function evaluate(block: Block): Evaluation {
         }
     }
 
-    // console.log(`wellPotential ${bestScores.well * 2}, flatness ${bestScores.flat * -2}, gaps ${bestScores.gaps * -3}, b2b ${bestScores.b2b   *5}`);
-    return { score: bestScore, bestBoard: bestBoard, bestRot: bestRot, ...bestMove };
+    return { score: bestScore, bestBoard: bestBoard, bestRot: bestRot, bestScores: bestScores, ...bestMove };
 }
 
 function delay(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 async function place() {
     if (window.__game.paused) return;
+    console.log("_________________________")
 
     const activeResult = evaluate(window.__game.activeBlock);
     // console.log("ACTIVE: ", activeResult.score);
@@ -214,6 +237,7 @@ async function place() {
             rot = holdResult.rot;
 
             console.log("HOLD");
+            console.log(holdResult.bestScores)
             console.log(holdResult.bestRot.replaceAll("],", "],\n "));   
             console.log(holdResult.bestBoard.replaceAll("],", "],\n ")) 
         }
@@ -221,10 +245,12 @@ async function place() {
 
     if (hold) sendKeyEvent("c", 67);
     else {
+        console.log(activeResult.bestScores)
         console.log(activeResult.bestRot.replaceAll("],", "],\n "));   
         console.log(activeResult.bestBoard.replaceAll("],", "],\n ")) 
     }
 
+    console.log({rot: rot, col: goalCol});
     switch (rot) {
         case 0: break;
         case 1: sendKeyEvent("ArrowUp", 38); break;
@@ -246,7 +272,8 @@ async function place() {
     }
     
     window.__game.hardDrop()
-    setTimeout(place, 1000);
+    if (!window.__game.gameEnded) place();
+    // setTimeout(place, 1000);
 }
 
 document.addEventListener("GameCaptured", () => {

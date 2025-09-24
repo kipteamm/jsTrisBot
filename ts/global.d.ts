@@ -8,13 +8,6 @@ type BlockSets = {
     blocks: Record<number, BlockSet>
 }
 
-type Scores = {
-    well: number,
-    gaps: number,
-    flat: number,
-    b2b: number
-}
-
 type Move = {
     col: number,
     rot: number
@@ -30,8 +23,9 @@ type Tetris = {
     nextMove: Move,
     placedBlocks: number,
     hardDrop: VoidFunction,
-    blockInHold: Block | null
-    paused: boolean
+    blockInHold: Block | null,
+    paused: boolean,
+    gameEnded: boolean
 }
 
 declare global {
